@@ -1,0 +1,54 @@
+# Project
+history/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+pip-wheel-metadata/
+.installed.cfg
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+
+# Pre-commit
+.pre-commit-cache/
+
+# Tooling
+.ipynb_checkpoints/
+.python-version
+
+# Env files
+.env
+.env.*
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
