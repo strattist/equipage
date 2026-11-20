@@ -1,0 +1,11 @@
+services:
+  agents:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Paris
+    volumes:
+      # On TrueNAS, point this at a dataset (e.g. /mnt/tank/apps/agents) so the
+      # database and profile.json survive updates. It must be writable by uid 1000.
+      - ./data:/data
