@@ -7,7 +7,7 @@ Two Discord agents that run on a home NAS (TrueNAS) and help with sport and food
 
 Both agents talk to the user in French. Everything else (code, database, prompts, this README) is English. See the language policy in `docs/superpowers/specs/2026-11-17-coach-design.md`.
 
-> **Status:** design and plans are written (see [Documentation](#documentation)); implementation follows the plans task by task. Sections below describe the target behavior and setup.
+> **Status:** the bot foundation and the coach are implemented (`docs/superpowers/plans/2026-11-17-coach-agent.md`); the nutritionist is designed and planned but not built yet, so its sections below describe the target behavior.
 
 ## How it works
 
@@ -102,7 +102,7 @@ uv pip install --python .venv/bin/python -r requirements.txt -r requirements-dev
 docker compose up -d --build
 ```
 
-The bot only makes outbound connections (Discord, Anthropic, Mealie). In `compose.yaml`, point the `./data:/data` volume at a TrueNAS dataset so the database survives updates. The container must be able to reach `MEALIE_URL`.
+The bot only makes outbound connections (Discord, Anthropic, Mealie). In `compose.yaml`, point the `./data:/data` volume at a TrueNAS dataset so the database survives updates; the container runs as uid 1000, which must be able to write there. Put `profile.json` in that dataset. The container must be able to reach `MEALIE_URL`.
 
 ## Tests
 

@@ -1,0 +1,22 @@
+{
+  "age": null,
+  "height_cm": null,
+  "weight_kg": null,
+  "goal": "Progressive, durable weight loss without injury or exhaustion, after a sedentary period.",
+  "available_minutes_per_day": "30-45",
+  "equipment": ["rowing machine", "bodyweight", "outdoor walking"],
+  "injuries_or_limits": "none known; stop on joint pain",
+  "weekly_structure": {
+    "mon": "Steady row (endurance), RPE 5",
+    "tue": "Rest",
+    "wed": "HIIT, 4-5 exercises x 3 rounds, RPE 7-8",
+    "thu": "Brisk walk 40 min",
+    "fri": "Rower intervals (500-750 m repeats), RPE 7-8",
+    "sat": "Light bodyweight strength circuit, 25-30 min",
+    "sun": "Rest or mobility 15 min"
+  },
+  "history": [
+    "Month 1 (14 Sep - 11 Oct 2026): return to exercise. 4 sessions a week plus a walk and 2 rest days, rower steady and intervals, HIIT progressing from 6 x 20 s / 90 s to 8 x 40 s / 50 s. The user did more HIIT efforts than prescribed every week (9, 12, 15, 12), so the HIIT was too easy.",
+    "Month 2 (12 Oct - 8 Nov 2026): HIIT baseline of 12 efforts, progressing by effort/rest ratio and intensity instead of adding reps (12 x 40 s / 50 s, then 12 x 45 s / 45 s), rower intervals 5-6 x 500 m and 4 x 750 m, Saturday strength circuit. Benchmark 20 min steady row at RPE 5 planned on 12 Oct (no result recorded). Ill from 26 Oct to 1 Nov, partial week 2-8 Nov, back on track from 9 Nov; HIIT 12 x 45 s / 45 s repeated on 4 Nov and 11 Nov."
+  ]
+}
