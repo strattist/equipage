@@ -1,5 +1,7 @@
 # Project
 history/
+data/*
+!data/profile.example.json
 
 # Virtual environments
 .venv/
@@ -47,6 +49,7 @@ coverage.xml
 # Env files
 .env
 .env.*
+!.env.example
 
 # Editors / OS
 .idea/
