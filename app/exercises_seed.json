@@ -1,0 +1,143 @@
+[
+  {
+    "key": "rower_sprint",
+    "name": "Rameur sprint",
+    "aliases": [
+      "sprint rameur",
+      "sprint au rameur",
+      "rower sprint",
+      "rowing sprint"
+    ],
+    "explanation": "Assis sur le rameur, pieds sanglés. Pousse fort avec les jambes, puis bascule le dos et tire les bras ; reviens dans l'ordre inverse : bras, dos, jambes.\nC'est dur mais contrôlé : garde le dos droit et ne tire pas avec les bras avant d'avoir poussé avec les jambes.",
+    "url": "https://www.youtube.com/results?search_query=Rameur+sprint+exercice"
+  },
+  {
+    "key": "squats",
+    "name": "Squats",
+    "aliases": [
+      "squat",
+      "air squats",
+      "air squat"
+    ],
+    "explanation": "Debout, pieds largeur d'épaules, pointes légèrement ouvertes. Descends comme pour t'asseoir sur une chaise, poids sur les talons, puis remonte en poussant dans le sol.\nGarde le dos droit et les genoux dans l'axe des pieds, sans qu'ils rentrent vers l'intérieur.",
+    "url": "https://www.youtube.com/results?search_query=Squats+exercice"
+  },
+  {
+    "key": "squat_jumps",
+    "name": "Squat jumps",
+    "aliases": [
+      "squats sautés",
+      "squat sauté",
+      "jump squats",
+      "jump squat"
+    ],
+    "explanation": "Fais un squat, puis remonte en sautant de façon explosive. Réceptionne-toi en douceur, genoux fléchis, et enchaîne directement le squat suivant.\nNe saute que si tes genoux vont bien ; sinon fais des squats classiques, plus rapides.",
+    "url": "https://www.youtube.com/results?search_query=Squat+jumps+exercice"
+  },
+  {
+    "key": "reverse_lunges",
+    "name": "Fentes arrière",
+    "aliases": [
+      "fente arrière",
+      "fentes arrières",
+      "reverse lunges",
+      "reverse lunge"
+    ],
+    "explanation": "Debout, fais un grand pas en arrière et descends jusqu'à ce que les deux genoux soient pliés à environ 90°. Pousse sur le talon avant pour revenir, puis change de jambe.\nLe genou avant reste au-dessus de la cheville ; c'est plus doux pour les genoux que les fentes avant.",
+    "url": "https://www.youtube.com/results?search_query=Fentes+arri%C3%A8re+exercice"
+  },
+  {
+    "key": "high_knees",
+    "name": "Montées de genoux",
+    "aliases": [
+      "montée de genoux",
+      "montées de genoux rapides",
+      "high knees"
+    ],
+    "explanation": "Sur place, cours en montant les genoux à hauteur des hanches, en balançant les bras. Reste sur l'avant des pieds avec un rythme rapide.\nSi c'est trop intense, marche sur place en montant les genoux sans sauter.",
+    "url": "https://www.youtube.com/results?search_query=Mont%C3%A9es+de+genoux+exercice"
+  },
+  {
+    "key": "skaters",
+    "name": "Skaters",
+    "aliases": [
+      "skater",
+      "patineur",
+      "sauts du patineur",
+      "sauts de patineur"
+    ],
+    "explanation": "Saute latéralement d'une jambe sur l'autre, comme un patineur de vitesse. Atterris sur un pied, l'autre jambe croise derrière, et le buste penche légèrement en avant.\nRéceptionne-toi en souplesse, genou fléchi ; réduis l'amplitude si tu perds l'équilibre.",
+    "url": "https://www.youtube.com/results?search_query=Skaters+exercice"
+  },
+  {
+    "key": "mountain_climbers",
+    "name": "Mountain climbers",
+    "aliases": [
+      "mountain climber",
+      "grimpeurs",
+      "grimpeur"
+    ],
+    "explanation": "En position de planche, mains sous les épaules, ramène un genou vers la poitrine puis l'autre, en alternant vite. Le bassin reste aligné avec les épaules.\nGarde les abdos serrés et ne lève pas les fesses vers le plafond.",
+    "url": "https://www.youtube.com/results?search_query=Mountain+climbers+exercice"
+  },
+  {
+    "key": "step_back_burpees",
+    "name": "Burpees avec pas en arrière",
+    "aliases": [
+      "burpees pas en arrière",
+      "burpee avec pas en arrière",
+      "burpees",
+      "burpee",
+      "step-back burpees",
+      "step-back burpee"
+    ],
+    "explanation": "Debout, pose les mains au sol, recule un pied puis l'autre pour arriver en planche. Ramène les pieds un par un vers les mains et relève-toi.\nMême effet qu'un burpee sauté, avec beaucoup moins d'impact ; garde le dos droit en planche.",
+    "url": "https://www.youtube.com/results?search_query=Burpees+avec+pas+en+arri%C3%A8re+exercice"
+  },
+  {
+    "key": "incline_push_ups",
+    "name": "Pompes inclinées",
+    "aliases": [
+      "pompe inclinée",
+      "pompes surélevées",
+      "incline push-ups",
+      "incline push-up",
+      "incline push ups"
+    ],
+    "explanation": "Mains sur une table, un lit ou un canapé stable, un peu plus larges que les épaules, corps bien droit. Descends la poitrine vers le support en pliant les coudes, puis pousse pour remonter.\nPlus le support est haut, plus c'est facile ; garde le corps gainé, sans creuser le dos.",
+    "url": "https://www.youtube.com/results?search_query=Pompes+inclin%C3%A9es+exercice"
+  },
+  {
+    "key": "glute_bridge",
+    "name": "Pont fessier",
+    "aliases": [
+      "ponts fessiers",
+      "glute bridges",
+      "glute bridge"
+    ],
+    "explanation": "Allongé sur le dos, genoux pliés, pieds à plat au sol. Pousse dans les talons pour lever les hanches jusqu'à aligner genoux, hanches et épaules, serre les fessiers 1 s, puis redescends.\nNe cambre pas le bas du dos en haut : c'est le fessier qui travaille.",
+    "url": "https://www.youtube.com/results?search_query=Pont+fessier+exercice"
+  },
+  {
+    "key": "bird_dog",
+    "name": "Bird-dog",
+    "aliases": [
+      "bird dog",
+      "birddog",
+      "chien d'arrêt"
+    ],
+    "explanation": "À quatre pattes, mains sous les épaules et genoux sous les hanches. Tends le bras droit devant et la jambe gauche derrière, tiens 2 s, reviens, puis change de côté.\nBouge lentement et garde le dos plat, comme si un verre d'eau était posé dessus.",
+    "url": "https://www.youtube.com/results?search_query=Bird-dog+exercice"
+  },
+  {
+    "key": "plank",
+    "name": "Gainage",
+    "aliases": [
+      "planche",
+      "gainage ventral",
+      "plank"
+    ],
+    "explanation": "Appuie-toi sur les avant-bras et la pointe des pieds, coudes sous les épaules, corps droit de la tête aux talons. Tiens la position en respirant calmement.\nSerre les abdos et les fessiers ; arrête si le bas du dos se creuse ou fait mal.",
+    "url": "https://www.youtube.com/results?search_query=Gainage+exercice"
+  }
+]
