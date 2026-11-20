@@ -1,6 +1,6 @@
 # Coach agent and Discord bot foundation: design
 
-Status: draft for approval. Not committed (user's rule: never commit). Written after the fact from decisions made in conversation; the first scaffold was rolled back so the work can follow spec, plan, tests.
+Status: implemented on branch `coach-agent` (see the plan's implementation record and the amendments at the end). Written after the fact from decisions made in conversation; the first scaffold was rolled back so the work can follow spec, plan, tests.
 
 ## Intent and why
 
@@ -68,7 +68,7 @@ The user (back to sport after a sedentary period, goal: progressive, durable wei
 ## Decisions made by the design (my calls, for the user to check)
 
 1. **Agents are data**: `Agent(name, prompt_file, tools)` plus `run_agent(agent, channel, user_text)`. Channel id → agent registry in the bot.
-2. **Tools** (names indicative): `get_profile`, `update_profile`, `save_planned_session` (one per day, upsert), `get_plan(start,end)` (planned + logged), `log_session(day, completed, done, rpe, notes, distance_m, duration_min, efforts, effort_s, rest_s)`, `get_recent_sessions(days)`, `record_benchmark`, `get_benchmarks`, `list_exercises`, `get_exercise(name)`, `set_exercise_url(name, url)` (to replace a link with a video the user prefers). Dates are ISO strings; invalid input returns an error string, never an exception. No list-typed parameters (one call per day).
+2. **Tools** (names indicative): `get_profile`, `update_profile`, `save_planned_session` (one per day, upsert), `get_plan(start,end)` (planned + logged), `log_session(day, completed, done, rpe, notes, distance_m, duration_min, efforts, effort_s, rest_s)`, `update_session_log(id, ...)` (adds details to an already logged session; see the amendments), `get_recent_sessions(days)`, `record_benchmark`, `get_benchmarks`, `list_exercises`, `get_exercise(name)`, `set_exercise_url(name, url)` (to replace a link with a video the user prefers). Dates are ISO strings; invalid input returns an error string, never an exception. No list-typed parameters (one call per day).
 3. **Shared tables**: `planned_sessions(date PK, kind, description)`, `session_logs` (with optional structured fields `distance_m`, `duration_min`, `efforts`, `effort_s`, `rest_s`, filled by the coach when the user reports numbers, e.g. "HIIT 12 x 45 s / 45 s" → efforts 12, effort_s 45, rest_s 45; the free-text `done` is kept too), `benchmarks`, `exercises(name, aliases, explanation, url)`, `messages` (chat history per channel), `kv`. `kind` ∈ `rowing|hiit|walk|strength|mobility|rest`; the nutritionist reads `kind` to find exercise days.
 4. **Chat history**: only visible user/assistant text is stored and replayed (last 24 messages); facts that matter live in tables, not in the chat. Replay must start with a user message.
 5. **Prompt caching**: the stable prompt is the first system block with `cache_control`; the date goes in a second block so it cannot invalidate the cache.
@@ -90,3 +90,11 @@ The user (back to sport after a sedentary period, goal: progressive, durable wei
 ## Open items
 
 None blocking.
+
+## Amendments made during implementation
+
+- **Logging a session once.** Only visible chat text is replayed, so the coach cannot remember earlier tool results. `get_plan` and `get_recent_sessions` therefore return each log's `id`, and `update_session_log` changes only the fields it is given. The prompt tells the coach to read `get_plan` before `log_session` and to update an existing row instead of logging again. `log_session` still always inserts, because one day can hold several real sessions.
+- **Check-ins.** `!checkin` also records `last_checkin`, so a manual check-in is not followed by the automatic one the same day.
+- **Weekly chart.** "New data" means the chart data (count and last date per panel) differs from the fingerprint stored when the last chart was posted.
+- **Errors.** Anthropic API errors give the French "Erreur côté API Claude" message; any other exception gives "Erreur interne" and is logged with its traceback.
+- **Refusal fallbacks.** `run_agent` opts into server-side refusal fallbacks (`fallbacks="default"`) on the models that support them.
