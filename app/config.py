@@ -15,6 +15,7 @@ PROMPTS_DIR: Path = ROOT / "prompts"
 MODEL: str = os.environ.get("CLAUDE_MODEL") or "claude-opus-5-5"
 TZ: ZoneInfo = ZoneInfo(os.environ.get("TZ") or "Europe/Paris")
 CHECKIN_HOUR: int = int(os.environ.get("CHECKIN_HOUR") or 18)
+NUTRITION_WEEKLY_HOUR: int = int(os.environ.get("NUTRITION_WEEKLY_HOUR") or 10)
 
 CHECKIN_EVERY_DAYS = 2
 HISTORY_LIMIT = 24

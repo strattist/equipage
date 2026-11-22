@@ -7,7 +7,7 @@ Two Discord agents that run on a home NAS (TrueNAS) and help with sport and food
 
 Both agents talk to the user in French. Everything else (code, database, prompts, this README) is English. See the language policy in `docs/superpowers/specs/2026-11-17-coach-design.md`.
 
-> **Status:** the bot foundation and the coach are implemented (`docs/superpowers/plans/2026-11-17-coach-agent.md`); the nutritionist is designed and planned but not built yet, so its sections below describe the target behavior.
+> **Status:** the bot foundation, the coach and the nutritionist are implemented (`docs/superpowers/plans/`). The nutritionist's live check against a real Mealie and Discord (last task of its plan) is still to be done by hand.
 
 ## How it works
 
@@ -75,8 +75,8 @@ Fill in `.env`:
 | `DISCORD_TOKEN` | yes | | Bot token |
 | `ALLOWED_USER_ID` | yes | | The only user the bot answers to (and who can press Confirmer) |
 | `COACH_CHANNEL_ID` | yes | | `#coach` channel |
-| `NUTRITION_CHANNEL_ID` | no | | `#nutrition` channel; the nutritionist is skipped with a warning if unset |
-| `MEALIE_URL` | for nutritionist | | Base URL of your Mealie |
+| `NUTRITION_CHANNEL_ID` | for nutritionist | | `#nutrition` channel; the nutritionist is skipped with a warning if this or a Mealie variable is unset |
+| `MEALIE_URL` | for nutritionist | | Base URL of your Mealie, reachable from the bot's container |
 | `MEALIE_API_TOKEN` | for nutritionist | | Mealie API token |
 | `CLAUDE_MODEL` | no | `claude-opus-5-5` | `claude-sonnet-5-5` is the cheaper option |
 | `TZ` | no | `Europe/Paris` | Scheduler timezone |

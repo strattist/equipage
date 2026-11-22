@@ -56,6 +56,35 @@ CREATE TABLE IF NOT EXISTS exercises (
     explanation TEXT NOT NULL DEFAULT '',
     url TEXT
 );
+CREATE TABLE IF NOT EXISTS fridge_items (
+    name TEXT PRIMARY KEY,
+    quantity TEXT,
+    updated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS away_days (
+    day TEXT PRIMARY KEY
+);
+CREATE TABLE IF NOT EXISTS draft_meta (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    version INTEGER NOT NULL,
+    new_recipe_count INTEGER NOT NULL,
+    shopping_written INTEGER NOT NULL DEFAULT 0
+);
+INSERT OR IGNORE INTO draft_meta (id, version, new_recipe_count, shopping_written) VALUES (1, 0, 0, 0);
+CREATE TABLE IF NOT EXISTS draft_dinners (
+    day TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    name TEXT NOT NULL,
+    dinner_type TEXT,
+    recipe_slug TEXT,
+    ingredients TEXT,
+    steps TEXT,
+    recipe_created INTEGER NOT NULL DEFAULT 0,
+    plan_written INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS draft_shopping (
+    item TEXT PRIMARY KEY
+);
 """
 
 
