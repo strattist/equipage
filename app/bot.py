@@ -4,8 +4,9 @@ exercise links, runs the check-in job and posts progress charts."""
 import io
 import json
 import logging
-from collections.abc import Iterator
-from datetime import date, datetime
+import os
+from collections.abc import Iterator, Mapping
+from datetime import date, datetime, timedelta
 
 import anthropic
 import discord
@@ -14,6 +15,10 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app import config, db, exercises, progress
 from app.coach import COACH
+from app.meals import store
+from app.meals.commit import CommitResult, commit_draft
+from app.meals.confirm import ConfirmController
+from app.nutritionist import NUTRITIONIST, mealie_client, meal_targets
 from app.runtime import Agent, run_agent
 
 log = logging.getLogger("agents.bot")
@@ -21,12 +26,27 @@ log = logging.getLogger("agents.bot")
 ALLOWED_USER_ID = int(config.require("ALLOWED_USER_ID"))
 COACH_CHANNEL_ID = int(config.require("COACH_CHANNEL_ID"))
 
-AGENTS: dict[int, Agent] = {COACH_CHANNEL_ID: COACH}
+NUTRITION_ENV = ("NUTRITION_CHANNEL_ID", "MEALIE_URL", "MEALIE_API_TOKEN")
+
+
+def build_agents(env: Mapping[str, str]) -> dict[int, Agent]:
+    """Channel id to agent. The nutritionist needs its channel and the Mealie settings."""
+    agents: dict[int, Agent] = {int(env["COACH_CHANNEL_ID"]): COACH}
+    missing = [name for name in NUTRITION_ENV if not env.get(name)]
+    if missing:
+        log.warning("Nutritionist disabled, missing: %s", ", ".join(missing))
+    else:
+        agents[int(env["NUTRITION_CHANNEL_ID"])] = NUTRITIONIST
+    return agents
+
+
+AGENTS: dict[int, Agent] = build_agents(os.environ)
 
 CHUNK_SIZE = 1900
 PROGRESS_EVERY_DAYS = 7
 MANUAL_CHECKIN = "[check-in] Manual check-in requested."
 AUTO_CHECKIN = "[check-in] Automatic end-of-day check-in."
+WEEKLY_EVERY_DAYS = 7
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -94,6 +114,11 @@ async def ask(channel, agent: Agent, text: str) -> None:
         reply = await _reply(agent, channel, text)
     for part in chunks(reply):
         await channel.send(part, suppress_embeds=True)
+    if agent is NUTRITIONIST:
+        try:
+            await post_draft_table(channel)
+        except Exception:
+            log.exception("Could not post the dinner table")
 
 
 def _fingerprint(data: progress.ProgressData) -> str | None:
@@ -165,6 +190,120 @@ async def checkin_job() -> None:
         log.exception("Automatic progress chart failed")
 
 
+# --- nutritionist: weekly run and the Confirmer button ---------------------------------
+
+
+def weekly_trigger_text() -> str:
+    return (
+        "[weekly] Automatic Sunday run. Ask the user, in one short message: which days next week "
+        "they are away, what changed in the fridge, and how many new recipes they want. "
+        "Do not plan yet."
+    )
+
+
+def should_run_weekly(last: str | None, today: date) -> bool:
+    days = _days_since(last, today)
+    return days is None or days >= WEEKLY_EVERY_DAYS
+
+
+def nutrition_channel_id() -> int | None:
+    return next((cid for cid, a in AGENTS.items() if a is NUTRITIONIST), None)
+
+
+async def nutrition_weekly_job() -> None:
+    channel_id = nutrition_channel_id()
+    channel = client.get_channel(channel_id) if channel_id else None
+    if channel is None:
+        log.error("Nutrition channel %s not found; check NUTRITION_CHANNEL_ID", channel_id)
+        return
+    today = _today()
+    if not should_run_weekly(db.kv_get("last_weekly"), today):
+        return
+    db.kv_set("last_weekly", today.isoformat())  # before asking: a crash must not repeat it
+    try:
+        await ask(channel, NUTRITIONIST, weekly_trigger_text())
+    except Exception:
+        log.exception("Weekly nutrition run failed")
+
+
+async def commit_current_draft(version: int) -> CommitResult:
+    async with mealie_client() as mealie:
+        return await commit_draft(version, mealie)
+
+
+controller = ConfirmController(
+    commit=lambda version: commit_current_draft(version),
+    latest_version=lambda: store.draft_get().version,
+)
+
+
+class ConfirmView(discord.ui.View):
+    """One Confirmer button, usable only by the allowed user."""
+
+    def __init__(self, table: "DiscordTableMessage | None" = None):
+        super().__init__(timeout=None)
+        self.table = table
+        button = discord.ui.Button(label="Confirmer", style=discord.ButtonStyle.success)
+        button.callback = self._pressed
+        self.add_item(button)
+
+    async def _pressed(self, interaction) -> None:
+        if interaction.user.id != ALLOWED_USER_ID:
+            await interaction.response.send_message(
+                "Ce bouton n'est pas pour toi.", ephemeral=True
+            )
+            return
+        if self.table is None:
+            return
+        await interaction.response.defer()
+        table = self.table
+        table.outcome_shown = False
+        text = await controller.on_press(table.version, table)
+        if not table.outcome_shown:  # failure or stale: tell the user where they are
+            await interaction.followup.send(text, suppress_embeds=True)
+
+
+class DiscordTableMessage:
+    """A posted dinner table. The controller compares tables by identity, so one object
+    is shared by the view, the controller and every later edit."""
+
+    def __init__(self, message, text: str, version: int):
+        self.message, self.text, self.version = message, text, version
+        self.outcome_shown = False
+
+    async def show_button(self, visible: bool) -> None:
+        view = ConfirmView(self) if visible else None
+        await self.message.edit(content=self.text, view=view)
+
+    async def set_text(self, text: str) -> None:
+        combined = f"{self.text}\n{text}"
+        await self.message.edit(
+            content=combined if len(combined) <= 2000 else text, view=None
+        )
+        self.outcome_shown = True
+
+
+def _draft_week(draft: store.Draft) -> tuple[date, date]:
+    first = min(draft.dinners)
+    monday = first - timedelta(days=first.weekday())
+    return monday, monday + timedelta(days=6)
+
+
+async def post_draft_table(channel) -> None:
+    """Post the dinner table with its button if the draft changed since the last table."""
+    draft = store.draft_get()
+    if not draft.dinners or str(draft.version) == db.kv_get("last_table_version"):
+        return
+    first, last = _draft_week(draft)
+    text = store.render_table(draft, meal_targets(first, last))
+    view = ConfirmView()
+    sent = await channel.send(text, view=view, suppress_embeds=True)
+    table = DiscordTableMessage(sent, text, draft.version)
+    view.table = table
+    db.kv_set("last_table_version", str(draft.version))
+    await controller.register(draft.version, table)
+
+
 @client.event
 async def on_message(message) -> None:
     if message.author.bot or message.author.id != ALLOWED_USER_ID:
@@ -195,6 +334,18 @@ async def on_ready() -> None:
             coalesce=True,
             misfire_grace_time=3600,
         )
+        if nutrition_channel_id() is not None:
+            scheduler.add_job(
+                nutrition_weekly_job,
+                CronTrigger(
+                    day_of_week="sun",
+                    hour=config.NUTRITION_WEEKLY_HOUR,
+                    minute=0,
+                    timezone=config.TZ,
+                ),
+                coalesce=True,
+                misfire_grace_time=3600,
+            )
         scheduler.start()
 
 
