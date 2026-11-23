@@ -40,7 +40,7 @@ def _same(a: str, b: str) -> bool:
 
 
 def fridge_list() -> list[dict]:
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         rows = conn.execute("SELECT name, quantity FROM fridge_items").fetchall()
     items = [{"name": r["name"], "quantity": r["quantity"] or ""} for r in rows]
     return sorted(items, key=lambda i: i["name"].casefold())
@@ -85,7 +85,7 @@ def away_set(days: list[date]) -> None:
 
 
 def away_get(start: date, end: date) -> set[date]:
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         rows = conn.execute(
             "SELECT day FROM away_days WHERE day BETWEEN ? AND ?",
             (start.isoformat(), end.isoformat()),
@@ -131,7 +131,7 @@ def _bump(conn) -> int:
 
 
 def draft_get() -> Draft:
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         meta = conn.execute("SELECT * FROM draft_meta WHERE id = 1").fetchone()
         dinners = conn.execute("SELECT * FROM draft_dinners ORDER BY day").fetchall()
         shopping = conn.execute(

@@ -107,6 +107,19 @@ def connect() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+@contextmanager
+def connect_ro() -> Iterator[sqlite3.Connection]:
+    """Read-only connection for everything a model can read: it can neither write nor
+    create the database file, whatever the SQL it is given."""
+    conn = sqlite3.connect(config.DB_PATH.resolve().as_uri() + "?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA query_only = ON")
+        yield conn
+    finally:
+        conn.close()
+
+
 def init() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)

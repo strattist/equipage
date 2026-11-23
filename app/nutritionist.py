@@ -6,17 +6,27 @@ presses the Confirmer button."""
 
 import json
 import os
+import re
 from datetime import date, timedelta
 
 from anthropic import beta_async_tool
 
 from app import config, db
 from app.coach import _day, _error, _Invalid, _json, _load_profile, get_profile
-from app.mealie import MEALIE_TAGS, MealieClient, MealieError
+from app.mealie import MEALIE_TAGS, MealieClient, MealieError, MealieReader
 from app.meals import rules, store
 from app.runtime import WEEKDAYS, Agent
+from app.validate import check_lines, check_text, parse_fridge
 
 MAX_RANGE_DAYS = 31
+
+# Limits on what the model may store (see app/validate.py for the link/mention rules).
+NAME_MAX = 100
+SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SLUG_MAX = 100
+INGREDIENT_MAX, INGREDIENT_LINES = 150, 40
+STEP_MAX, STEP_LINES = 400, 40
+SHOPPING_MAX, SHOPPING_LINES = 80, 60
 
 
 def _date_range(start: str, end: str) -> tuple[date, date]:
@@ -35,7 +45,7 @@ def _lines(text: str) -> list[str]:
 
 
 def _coach_kinds(first: date, last: date) -> dict[date, str]:
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         rows = conn.execute(
             "SELECT date, kind FROM planned_sessions WHERE date BETWEEN ? AND ?",
             (first.isoformat(), last.isoformat()),
@@ -93,15 +103,6 @@ async def get_meal_targets(start: str, end: str) -> str:
 # --- fridge and away days ------------------------------------------------------------
 
 
-def _parse_items(text: str) -> list[tuple[str, str]]:
-    items = []
-    for line in _lines(text):
-        name, _, quantity = line.partition(":")
-        if name.strip():
-            items.append((name.strip(), quantity.strip()))
-    return items
-
-
 @beta_async_tool
 async def get_fridge() -> str:
     """List what is currently in the fridge."""
@@ -113,12 +114,22 @@ async def add_fridge_items(items: str) -> str:
     """Add or update fridge items.
 
     Args:
-        items: One item per line, as `name: quantity` (the quantity is optional free text).
+        items: One item per line, as `name: quantity` (the quantity is optional free text). Lines with links or odd characters are rejected and reported.
     """
-    parsed = _parse_items(items)
+    try:
+        parsed, rejected = parse_fridge(items)
+    except ValueError as exc:
+        return _error(str(exc))
     for name, quantity in parsed:
         store.fridge_add(name, quantity)
-    return _json({"ok": True, "added": len(parsed), "items": store.fridge_list()})
+    return _json(
+        {
+            "ok": True,
+            "added": len(parsed),
+            "rejected": rejected,
+            "items": store.fridge_list(),
+        }
+    )
 
 
 @beta_async_tool
@@ -138,10 +149,18 @@ async def replace_fridge(items: str) -> str:
     """Replace the whole fridge content.
 
     Args:
-        items: One item per line, as `name: quantity`. An empty text empties the fridge.
+        items: One item per line, as `name: quantity`. An empty text empties the fridge. If every line is rejected, nothing changes.
     """
-    store.fridge_replace(_parse_items(items))
-    return _json({"ok": True, "items": store.fridge_list()})
+    try:
+        parsed, rejected = parse_fridge(items)
+    except ValueError as exc:
+        return _error(str(exc))
+    if (items or "").strip() and not parsed:
+        return _error(f"no valid fridge line, the fridge is unchanged: {rejected}")
+    store.fridge_replace(parsed)
+    return _json(
+        {"ok": True, "rejected": rejected, "items": store.fridge_list()}
+    )
 
 
 @beta_async_tool
@@ -237,7 +256,16 @@ async def set_draft_dinner(
     """
     try:
         target_day = date.fromisoformat(_day(day))
-    except _Invalid as exc:
+        name = check_text(name, "name", NAME_MAX)
+        if recipe_slug and not (
+            len(recipe_slug) <= SLUG_MAX and SLUG_RE.match(recipe_slug)
+        ):
+            raise ValueError("recipe_slug must be a Mealie slug (lowercase, digits, -)")
+        ingredient_lines = check_lines(
+            _lines(ingredients), "ingredients", INGREDIENT_LINES, INGREDIENT_MAX
+        )
+        step_lines = check_lines(_lines(steps), "steps", STEP_LINES, STEP_MAX)
+    except (_Invalid, ValueError) as exc:
         return _error(str(exc))
     target = meal_targets(target_day, target_day)[0]
     if target.away:
@@ -249,8 +277,8 @@ async def set_draft_dinner(
             name,
             dinner_type=target.dinner_type,
             recipe_slug=recipe_slug or None,
-            ingredients=_lines(ingredients),
-            steps=_lines(steps),
+            ingredients=ingredient_lines,
+            steps=step_lines,
         )
     except ValueError as exc:
         return _error(str(exc))
@@ -266,7 +294,11 @@ async def set_draft_shopping_list(items: str) -> str:
     Args:
         items: One shopping item per line, in French.
     """
-    version = store.draft_set_shopping(_lines(items))
+    try:
+        lines = check_lines(_lines(items), "shopping items", SHOPPING_LINES, SHOPPING_MAX)
+    except ValueError as exc:
+        return _error(str(exc))
+    version = store.draft_set_shopping(lines)
     return _json({"ok": True, "version": version})
 
 
@@ -285,11 +317,23 @@ async def clear_draft() -> str:
 # --- Mealie (read-only) --------------------------------------------------------------
 
 
-def mealie_client() -> MealieClient:
-    url, token = os.environ.get("MEALIE_URL"), os.environ.get("MEALIE_API_TOKEN")
+def _mealie_settings(role: str) -> tuple[str, str]:
+    url, token = os.environ.get("MEALIE_URL"), config.mealie_token(role)
     if not url or not token:
-        raise MealieError("Mealie is not configured (MEALIE_URL / MEALIE_API_TOKEN)")
-    return MealieClient(url, token)
+        raise MealieError(
+            f"Mealie is not configured (MEALIE_URL / MEALIE_{role.upper()}_TOKEN)"
+        )
+    return url, token
+
+
+def mealie_reader() -> MealieReader:
+    """Read-only client with the read token: what the model's recipe tools use."""
+    return MealieReader(*_mealie_settings("read"))
+
+
+def mealie_writer() -> MealieClient:
+    """Full client with the write token: only the Confirmer commit uses it."""
+    return MealieClient(*_mealie_settings("write"))
 
 
 @beta_async_tool
@@ -301,7 +345,7 @@ async def search_recipes(query: str = "", tag: str = "") -> str:
         tag: `protein`, `veggie`, or a Mealie tag text (optional).
     """
     try:
-        async with mealie_client() as client:
+        async with mealie_reader() as client:
             found = await client.search_recipes(
                 query, MEALIE_TAGS.get(tag, tag) or None
             )
@@ -320,7 +364,7 @@ async def get_recipe(slug: str) -> str:
         slug: The recipe slug from search_recipes.
     """
     try:
-        async with mealie_client() as client:
+        async with mealie_reader() as client:
             return _json(await client.get_recipe(slug))
     except MealieError as exc:
         return _error(str(exc))

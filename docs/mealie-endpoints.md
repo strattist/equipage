@@ -8,6 +8,12 @@ Base URL: `MEALIE_URL` (no trailing slash). Every path starts with `/api`.
 
 `Authorization: Bearer <MEALIE_API_TOKEN>` on every request (API token created at `/user/profile/api-tokens`). Checked: `GET /api/app/about` and the read calls below answer `200` with it. A wrong token gives `401`.
 
+### Tokens
+
+The nutritionist uses two tokens (`MEALIE_READ_TOKEN`, `MEALIE_WRITE_TOKEN`), from two Mealie users. The read token belongs to a second user with the fewest permissions that still allow reading recipes; the write token belongs to the user that may create recipes, plan entries and shopping items. `MealieReader` only sends `GET`, so the model's recipe tools cannot write even with a powerful token, but the Mealie-side restriction is the second line of defence.
+
+**To verify by hand on the real instance** (not yet done): with the read token, `curl -X POST "$MEALIE_URL/api/recipes" -H "Authorization: Bearer $READ" -H "Content-Type: application/json" -d '{"name":"x"}'` must be refused (401/403), while the same `GET /api/recipes` call must work.
+
 All list endpoints are paginated: `{"page", "per_page", "total", "total_pages", "items", "next", "previous"}`; query parameters `page` and `perPage`.
 
 ## 1. Search recipes: `GET /api/recipes`

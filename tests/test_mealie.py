@@ -8,6 +8,7 @@ from app.mealie import (
     MealieAuthError,
     MealieClient,
     MealieError,
+    MealieReader,
     MealieUnavailable,
     RecipeSummary,
 )
@@ -279,3 +280,14 @@ async def test_search_by_a_tag_that_does_not_exist_returns_nothing(mealie):
     fake, client = mealie
     fake.add_recipe("Soupe de poireaux")  # untagged, no tag exists in Mealie at all
     assert await client.search_recipes(tag="protéines") == []
+
+
+async def test_reader_has_no_write_methods_and_refuses_writes(mealie):
+    fake, _ = mealie
+    async with MealieReader(fake.base_url, fake.token) as reader:
+        for name in ("create_recipe", "set_meal_plan_entry", "add_shopping_items"):
+            assert not hasattr(reader, name)
+        with pytest.raises(ValueError):
+            await reader._request("POST", "/api/recipes", json={"name": "x"})
+        assert fake.recipes == {}
+        assert await reader.search_recipes() == []

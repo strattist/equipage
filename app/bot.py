@@ -1,5 +1,6 @@
 """Discord bot: routes each channel to its agent, sends replies in chunks with
-exercise links, runs the check-in job and posts progress charts."""
+exercise links and posts progress charts. The coach never writes first: the only
+automatic jobs are the optional progress chart and the nutritionist's weekly run."""
 
 import io
 import json
@@ -18,7 +19,7 @@ from app.coach import COACH
 from app.meals import store
 from app.meals.commit import CommitResult, commit_draft
 from app.meals.confirm import ConfirmController
-from app.nutritionist import NUTRITIONIST, mealie_client, meal_targets
+from app.nutritionist import NUTRITIONIST, meal_targets, mealie_writer
 from app.runtime import Agent, run_agent
 
 log = logging.getLogger("agents.bot")
@@ -26,17 +27,27 @@ log = logging.getLogger("agents.bot")
 ALLOWED_USER_ID = int(config.require("ALLOWED_USER_ID"))
 COACH_CHANNEL_ID = int(config.require("COACH_CHANNEL_ID"))
 
-NUTRITION_ENV = ("NUTRITION_CHANNEL_ID", "MEALIE_URL", "MEALIE_API_TOKEN")
+NUTRITION_ENV = ("NUTRITION_CHANNEL_ID", "MEALIE_URL")
 
 
 def build_agents(env: Mapping[str, str]) -> dict[int, Agent]:
     """Channel id to agent. The nutritionist needs its channel and the Mealie settings."""
     agents: dict[int, Agent] = {int(env["COACH_CHANNEL_ID"]): COACH}
     missing = [name for name in NUTRITION_ENV if not env.get(name)]
+    read, write = config.mealie_token("read", env), config.mealie_token("write", env)
+    if not read:
+        missing.append("MEALIE_READ_TOKEN (or MEALIE_API_TOKEN)")
+    if not write:
+        missing.append("MEALIE_WRITE_TOKEN (or MEALIE_API_TOKEN)")
     if missing:
         log.warning("Nutritionist disabled, missing: %s", ", ".join(missing))
-    else:
-        agents[int(env["NUTRITION_CHANNEL_ID"])] = NUTRITIONIST
+        return agents
+    if read == write:
+        log.warning(
+            "One Mealie token does both reading and writing; create a read-only "
+            "MEALIE_READ_TOKEN and a MEALIE_WRITE_TOKEN"
+        )
+    agents[int(env["NUTRITION_CHANNEL_ID"])] = NUTRITIONIST
     return agents
 
 
@@ -44,8 +55,6 @@ AGENTS: dict[int, Agent] = build_agents(os.environ)
 
 CHUNK_SIZE = 1900
 PROGRESS_EVERY_DAYS = 7
-MANUAL_CHECKIN = "[check-in] Manual check-in requested."
-AUTO_CHECKIN = "[check-in] Automatic end-of-day check-in."
 WEEKLY_EVERY_DAYS = 7
 
 intents = discord.Intents.default()
@@ -82,18 +91,16 @@ def _days_since(last: str | None, today: date) -> int | None:
         return None
 
 
-def should_checkin(
-    last: str | None, today: date, every_days: int = config.CHECKIN_EVERY_DAYS
+def should_send_progress(
+    last: str | None,
+    today: date,
+    has_new_data: bool,
+    every_days: int = PROGRESS_EVERY_DAYS,
 ) -> bool:
-    days = _days_since(last, today)
-    return days is None or days >= every_days
-
-
-def should_send_progress(last: str | None, today: date, has_new_data: bool) -> bool:
     if not has_new_data:
         return False
     days = _days_since(last, today)
-    return days is None or days >= PROGRESS_EVERY_DAYS
+    return days is None or days >= every_days
 
 
 async def _reply(agent: Agent, channel, text: str) -> str:
@@ -165,26 +172,24 @@ async def send_progress(channel, force: bool) -> None:
     )
 
 
-async def checkin_job() -> None:
+async def progress_job() -> None:
+    """Optional automatic chart (PROGRESS_AUTO_DAYS > 0): only when there is new data."""
     channel = client.get_channel(COACH_CHANNEL_ID)
     if channel is None:
         log.error(
             "Coach channel %s not found; check COACH_CHANNEL_ID", COACH_CHANNEL_ID
         )
         return
-    today = _today()
-    if should_checkin(db.kv_get("last_checkin"), today):
-        db.kv_set(
-            "last_checkin", today.isoformat()
-        )  # before asking: a crash must not repeat it
-        try:
-            await ask(channel, COACH, AUTO_CHECKIN)
-        except Exception:
-            log.exception("Automatic check-in failed")
     try:
+        today = _today()
         fingerprint = _fingerprint(progress.load_progress())
         has_new = fingerprint is not None and fingerprint != db.kv_get("progress_data")
-        if should_send_progress(db.kv_get("last_progress"), today, has_new):
+        if should_send_progress(
+            db.kv_get("last_progress"),
+            today,
+            has_new,
+            every_days=config.PROGRESS_AUTO_DAYS,
+        ):
             await send_progress(channel, force=False)
     except Exception:
         log.exception("Automatic progress chart failed")
@@ -227,7 +232,7 @@ async def nutrition_weekly_job() -> None:
 
 
 async def commit_current_draft(version: int) -> CommitResult:
-    async with mealie_client() as mealie:
+    async with mealie_writer() as mealie:
         return await commit_draft(version, mealie)
 
 
@@ -315,11 +320,32 @@ async def on_message(message) -> None:
     if content == "!progress" and agent is COACH:
         await send_progress(message.channel, force=True)
         return
-    if content == "!checkin" and agent is COACH:
-        db.kv_set("last_checkin", _today().isoformat())
-        content = MANUAL_CHECKIN
     if content:
         await ask(message.channel, agent, content)
+
+
+def register_jobs(scheduler: AsyncIOScheduler) -> None:
+    if config.PROGRESS_AUTO_DAYS > 0:
+        scheduler.add_job(
+            progress_job,
+            CronTrigger(hour=config.PROGRESS_HOUR, minute=0, timezone=config.TZ),
+            id="progress",
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+    if nutrition_channel_id() is not None:
+        scheduler.add_job(
+            nutrition_weekly_job,
+            CronTrigger(
+                day_of_week="sun",
+                hour=config.NUTRITION_WEEKLY_HOUR,
+                minute=0,
+                timezone=config.TZ,
+            ),
+            id="nutrition_weekly",
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
 
 
 @client.event
@@ -328,24 +354,7 @@ async def on_ready() -> None:
     log.info("Logged in as %s", client.user)
     if scheduler is None:
         scheduler = AsyncIOScheduler(timezone=config.TZ)
-        scheduler.add_job(
-            checkin_job,
-            CronTrigger(hour=config.CHECKIN_HOUR, minute=0, timezone=config.TZ),
-            coalesce=True,
-            misfire_grace_time=3600,
-        )
-        if nutrition_channel_id() is not None:
-            scheduler.add_job(
-                nutrition_weekly_job,
-                CronTrigger(
-                    day_of_week="sun",
-                    hour=config.NUTRITION_WEEKLY_HOUR,
-                    minute=0,
-                    timezone=config.TZ,
-                ),
-                coalesce=True,
-                misfire_grace_time=3600,
-            )
+        register_jobs(scheduler)
         scheduler.start()
 
 

@@ -1,5 +1,7 @@
 import sqlite3
 
+import pytest
+
 from app import config, db
 
 
@@ -60,3 +62,35 @@ def test_init_is_idempotent(tmp_db):
         "kv",
         "exercises",
     } <= tables
+
+
+def test_connect_ro_reads_but_cannot_write(tmp_db):
+    db.kv_set("k", "v")
+    with db.connect_ro() as conn:
+        row = conn.execute("SELECT value FROM kv WHERE key = 'k'").fetchone()
+        assert row["value"] == "v"
+        with pytest.raises(sqlite3.OperationalError):
+            conn.execute("INSERT INTO kv (key, value) VALUES ('x', 'y')")
+        with pytest.raises(sqlite3.OperationalError):
+            conn.execute("CREATE TABLE t (x)")
+
+
+def test_connect_ro_reads_while_a_writer_is_mid_transaction(tmp_db):
+    writer = sqlite3.connect(config.DB_PATH)
+    writer.execute("INSERT INTO kv (key, value) VALUES ('w', '1')")
+    try:
+        with db.connect_ro() as conn:
+            count = conn.execute("SELECT count(*) FROM kv WHERE key = 'w'").fetchone()
+            assert count[0] == 0
+    finally:
+        writer.rollback()
+        writer.close()
+
+
+def test_connect_ro_on_missing_database_raises_and_creates_nothing(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "nope.sqlite3")
+    with pytest.raises(sqlite3.OperationalError), db.connect_ro():
+        pass
+    assert not (tmp_path / "nope.sqlite3").exists()

@@ -46,7 +46,7 @@ def seed() -> None:
 
 
 def _rows() -> list[dict]:
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         rows = conn.execute(
             "SELECT key, name, aliases, explanation, url FROM exercises ORDER BY name"
         ).fetchall()

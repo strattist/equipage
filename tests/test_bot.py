@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import anthropic
 import httpx2
 import pytest
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app import config, db, exercises
 
@@ -84,16 +85,6 @@ def test_chunks_long_text_each_under_limit_and_no_content_lost(bot, text):
     assert "".join(text.split()) == "".join("".join(parts).split())
 
 
-def test_should_checkin_rules(bot):
-    t = date(2026, 11, 20)
-    assert bot.should_checkin(None, t) is True
-    assert bot.should_checkin("2026-11-19", t) is False
-    assert bot.should_checkin("2026-11-20", t) is False
-    assert bot.should_checkin("2026-11-18", t) is True
-    assert bot.should_checkin("2026-10-31", date(2026, 11, 2)) is True
-    assert bot.should_checkin("garbage", t) is True
-
-
 async def test_ask_sends_api_error_message(bot, monkeypatch):
     async def boom(*args):
         raise anthropic.APIConnectionError(
@@ -129,27 +120,6 @@ async def test_ask_links_exercise_names_and_suppresses_embeds(bot, monkeypatch):
     [sent] = channel.sent
     assert f"[squats]({exercises.get('squats')['url']})" in sent["content"]
     assert sent["suppress_embeds"] is True
-
-
-async def test_checkin_job_records_state_before_asking(bot, monkeypatch):
-    async def boom(*args):
-        raise RuntimeError("discord down")
-
-    monkeypatch.setattr(bot, "ask", boom)
-    monkeypatch.setattr(bot.client, "get_channel", lambda cid: FakeChannel(cid))
-    await bot.checkin_job()
-    assert db.kv_get("last_checkin") == today().isoformat()
-
-
-async def test_checkin_job_skips_when_recent(bot, monkeypatch):
-    run = recorder()
-    monkeypatch.setattr(bot, "run_agent", run)
-    channel = FakeChannel()
-    monkeypatch.setattr(bot.client, "get_channel", lambda cid: channel)
-    await bot.checkin_job()
-    await bot.checkin_job()  # same day, e.g. after a restart
-    texts = [c[2] for c in run.calls]
-    assert texts == ["[check-in] Automatic end-of-day check-in."]
 
 
 def test_should_send_progress_rules(bot):
@@ -196,29 +166,21 @@ async def test_automatic_progress_only_with_new_data(bot, monkeypatch):
     monkeypatch.setattr(bot.progress, "render_png", lambda data: b"\x89PNG fake")
     channel = FakeChannel()
     monkeypatch.setattr(bot.client, "get_channel", lambda cid: channel)
-    db.kv_set("last_checkin", today().isoformat())  # no check-in today
+    monkeypatch.setattr(config, "PROGRESS_AUTO_DAYS", 7)
 
-    await bot.checkin_job()  # nothing logged yet: nothing new, no chart
+    await bot.progress_job()  # nothing logged yet: nothing new, no chart
     assert channel.sent == []
 
     with db.connect() as conn:
         conn.execute(
             "INSERT INTO benchmarks (date, distance_m, created_at) VALUES ('2026-10-12', 4000, 'x')"
         )
-    await bot.checkin_job()
+    await bot.progress_job()
     assert [s.get("file").filename for s in channel.sent] == ["progres.png"]
 
     db.kv_set("last_progress", "2000-01-01")  # a week has passed, but no new data
-    await bot.checkin_job()
+    await bot.progress_job()
     assert len(channel.sent) == 1
-
-
-async def test_manual_checkin_sends_trigger_and_records_state(bot, monkeypatch):
-    run = recorder()
-    monkeypatch.setattr(bot, "run_agent", run)
-    await bot.on_message(fake_message("!checkin"))
-    assert run.calls[0][2] == "[check-in] Manual check-in requested."
-    assert db.kv_get("last_checkin") == today().isoformat()
 
 
 async def test_other_users_are_ignored(bot, monkeypatch):
@@ -231,3 +193,43 @@ async def test_other_users_are_ignored(bot, monkeypatch):
     assert run.calls == [] and channel.sent == []
     await bot.on_message(fake_message("salut", channel=channel))
     assert run.calls == [(bot.COACH, str(CHANNEL_ID), "salut")]
+
+
+def test_checkin_machinery_is_gone(bot):
+    for name in ("checkin_job", "should_checkin", "AUTO_CHECKIN", "MANUAL_CHECKIN"):
+        assert not hasattr(bot, name)
+    assert not hasattr(config, "CHECKIN_HOUR")
+    assert not hasattr(config, "CHECKIN_EVERY_DAYS")
+
+
+async def test_bang_checkin_is_plain_text_and_records_nothing(bot, monkeypatch):
+    run = recorder()
+    monkeypatch.setattr(bot, "run_agent", run)
+    await bot.on_message(fake_message("!checkin"))
+    assert run.calls[0][2] == "!checkin"
+    assert db.kv_get("last_checkin") is None
+
+
+def test_should_send_progress_honours_every_days(bot):
+    assert (
+        bot.should_send_progress("2026-11-17", date(2026, 11, 20), True, every_days=3)
+        is True
+    )
+    assert (
+        bot.should_send_progress("2026-11-17", date(2026, 11, 20), True, every_days=4)
+        is False
+    )
+
+
+def test_no_progress_job_by_default(bot, monkeypatch):
+    monkeypatch.setattr(config, "PROGRESS_AUTO_DAYS", 0)
+    scheduler = AsyncIOScheduler()
+    bot.register_jobs(scheduler)
+    assert "progress" not in {j.id for j in scheduler.get_jobs()}
+
+
+def test_progress_job_registered_when_enabled(bot, monkeypatch):
+    monkeypatch.setattr(config, "PROGRESS_AUTO_DAYS", 7)
+    scheduler = AsyncIOScheduler()
+    bot.register_jobs(scheduler)
+    assert "progress" in {j.id for j in scheduler.get_jobs()}

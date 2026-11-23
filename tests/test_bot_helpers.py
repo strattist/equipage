@@ -206,3 +206,28 @@ async def test_confirm_button_commits_for_allowed_user(bot, monkeypatch):
     assert seen == [store.draft_get().version]
     assert "Confirmé" in sent.edits[-1]["content"]
     assert sent.edits[-1]["view"] is None
+
+
+SPLIT_ENV = {
+    k: v for k, v in FULL_ENV.items() if k != "MEALIE_API_TOKEN"
+} | {"MEALIE_READ_TOKEN": "read", "MEALIE_WRITE_TOKEN": "write"}
+
+
+def test_agents_registry_accepts_split_tokens(bot, caplog):
+    assert bot.build_agents(SPLIT_ENV) == {
+        COACH_ID: bot.COACH,
+        NUTRITION_ID: bot.NUTRITIONIST,
+    }
+    assert "MEALIE_READ_TOKEN" not in caplog.text
+
+
+def test_agents_registry_skips_nutritionist_with_only_a_read_token(bot, caplog):
+    env = {k: v for k, v in SPLIT_ENV.items() if k != "MEALIE_WRITE_TOKEN"}
+    assert bot.build_agents(env) == {COACH_ID: bot.COACH}
+    assert "MEALIE_WRITE_TOKEN" in caplog.text
+
+
+def test_agents_registry_warns_when_one_token_does_both(bot, caplog):
+    agents = bot.build_agents(FULL_ENV)
+    assert agents == {COACH_ID: bot.COACH, NUTRITION_ID: bot.NUTRITIONIST}
+    assert "MEALIE_READ_TOKEN" in caplog.text
