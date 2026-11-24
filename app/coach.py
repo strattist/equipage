@@ -141,7 +141,7 @@ async def get_plan(start: str, end: str) -> str:
         start, end = _day(start, "start"), _day(end, "end")
     except _Invalid as exc:
         return _error(str(exc))
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         planned = conn.execute(
             "SELECT date, kind, description FROM planned_sessions "
             "WHERE date BETWEEN ? AND ? ORDER BY date",
@@ -273,7 +273,7 @@ async def get_recent_sessions(days: int = 14) -> str:
     if days < 0:
         return _error(f"days must be positive, got {days}")
     since = (datetime.now(config.TZ).date() - timedelta(days=days)).isoformat()
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         rows = conn.execute(
             f"SELECT {LOG_FIELDS} FROM session_logs WHERE date >= ? ORDER BY date, id",
             (since,),
@@ -312,7 +312,7 @@ async def record_benchmark(
 @beta_async_tool
 async def get_benchmarks() -> str:
     """All rowing benchmarks, oldest first."""
-    with db.connect() as conn:
+    with db.connect_ro() as conn:
         rows = conn.execute(
             "SELECT date, distance_m, avg_split_s, notes FROM benchmarks ORDER BY date, id"
         ).fetchall()

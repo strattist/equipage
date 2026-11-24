@@ -28,9 +28,9 @@ The nutritionist reads the coach's planned sessions from the shared database to 
 ### Coach
 
 - Weekly structure (Mon steady row, Wed HIIT, Thu brisk walk, Fri rower intervals, Sat light strength, 2 full rest days), adapted from your feedback in both directions.
-- Automatic check-in at `CHECKIN_HOUR`, only if the last one is at least 2 days old. `!checkin` forces one.
+- Pull-based: the coach never writes first and never asks for reports. You decide when to tell it what you did; an unlogged session is simply unknown.
 - Exercise names in replies become links to a short explanation or video.
-- `!progress` (and automatically about once a week) posts a chart: rowing benchmark distance, HIIT effort vs rest, distance per rower session, with a short encouraging message based on the real numbers.
+- `!progress` posts a chart (automatically too if you set `PROGRESS_AUTO_DAYS`): rowing benchmark distance, HIIT effort vs rest, distance per rower session, with a short encouraging message based on the real numbers.
 - Joint pain stops the session; no medical advice.
 
 ### Nutritionist
@@ -38,6 +38,7 @@ The nutritionist reads the coach's planned sessions from the shared database to 
 - Sundays at `NUTRITION_WEEKLY_HOUR`: asks which days you are away, fridge changes, and how many new recipes you want this week.
 - Proposes a dinner table; you can ask for changes ("remplace jeudi par du poisson").
 - **Nothing is written to Mealie until you press the Confirmer button** under the table. The button disappears once used, and only the latest table can be confirmed.
+- Input limits (`app/validate.py`): what the nutritionist stores is bounded and must not contain links, markdown links or Discord mentions. The fridge takes at most 40 lines and 600 characters, one `name: quantity` per line with plain letters, digits and basic punctuation; rejected lines are reported back and a replace whose lines are all rejected leaves the fridge untouched.
 - Every recipe is for 2 portions (dinner + next day's lunch). Protein dinners fall on exercise days, veggie dinners on the others.
 
 ## Requirements
@@ -58,7 +59,7 @@ The nutritionist reads the coach's planned sessions from the shared database to 
 
 ### 2. Mealie (nutritionist)
 
-Create an API token at `<MEALIE_URL>/user/profile/api-tokens`. The endpoints used are documented in `docs/mealie-endpoints.md` (taken from your instance's `/docs`).
+Create two API tokens at `<MEALIE_URL>/user/profile/api-tokens`, from two Mealie users: a read-only one (`MEALIE_READ_TOKEN`) and one allowed to create recipes, meal plan entries and shopping items (`MEALIE_WRITE_TOKEN`). See the Tokens section of `docs/mealie-endpoints.md` to check the read user really cannot write. The endpoints used are documented in `docs/mealie-endpoints.md` (taken from your instance's `/docs`).
 
 ### 3. Configuration
 
@@ -77,10 +78,13 @@ Fill in `.env`:
 | `COACH_CHANNEL_ID` | yes | | `#coach` channel |
 | `NUTRITION_CHANNEL_ID` | for nutritionist | | `#nutrition` channel; the nutritionist is skipped with a warning if this or a Mealie variable is unset |
 | `MEALIE_URL` | for nutritionist | | Base URL of your Mealie, reachable from the bot's container |
-| `MEALIE_API_TOKEN` | for nutritionist | | Mealie API token |
+| `MEALIE_READ_TOKEN` | for nutritionist | | Token of a low-privilege Mealie user: recipe search and reading only (the client refuses any non-GET request with it) |
+| `MEALIE_WRITE_TOKEN` | for nutritionist | | Token used only by the Confirmer commit (recipes, meal plan, shopping list) |
+| `MEALIE_API_TOKEN` | legacy | | One token for both roles: still works, with a warning |
 | `CLAUDE_MODEL` | no | `claude-opus-5-5` | `claude-sonnet-5-5` is the cheaper option |
 | `TZ` | no | `Europe/Paris` | Scheduler timezone |
-| `CHECKIN_HOUR` | no | `18` | Hour of the daily check-in job |
+| `PROGRESS_AUTO_DAYS` | no | `0` | `0`: the progress chart is only posted on `!progress`. `N`: also posted automatically when there is new data, at most every N days |
+| `PROGRESS_HOUR` | no | `18` | Hour of the automatic progress job |
 | `NUTRITION_WEEKLY_HOUR` | no | `10` | Hour of the Sunday nutrition run |
 | `DATA_DIR` | no | `./data` (`/data` in Docker) | SQLite database and profile |
 

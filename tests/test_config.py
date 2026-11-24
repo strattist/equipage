@@ -25,3 +25,25 @@ def test_model_default_is_opus_5_5(monkeypatch):
     monkeypatch.delenv("CLAUDE_MODEL", raising=False)
     importlib.reload(config)
     assert config.MODEL == "claude-opus-5-5"
+
+
+def test_progress_auto_days_empty_means_off(monkeypatch):
+    from app import config
+
+    monkeypatch.setenv("PROGRESS_AUTO_DAYS", "")
+    importlib.reload(config)
+    assert config.PROGRESS_AUTO_DAYS == 0
+
+
+def test_mealie_token_prefers_the_role_token_then_the_legacy_one():
+    from app import config
+
+    assert config.mealie_token("read", {}) is None
+    assert config.mealie_token("write", {}) is None
+    legacy = {"MEALIE_API_TOKEN": "legacy"}
+    assert config.mealie_token("read", legacy) == "legacy"
+    assert config.mealie_token("write", legacy) == "legacy"
+    mixed = {**legacy, "MEALIE_READ_TOKEN": "r"}
+    assert config.mealie_token("read", mixed) == "r"
+    assert config.mealie_token("write", mixed) == "legacy"
+    assert config.mealie_token("write", {"MEALIE_WRITE_TOKEN": "w"}) == "w"

@@ -55,7 +55,11 @@ def _clean(items: Iterable[str]) -> list[str]:
     return cleaned
 
 
-class MealieClient:
+class MealieReader:
+    """Read-only client: it can only send GET requests, whatever its caller does."""
+
+    ALLOWED_METHODS = frozenset({"GET"})
+
     def __init__(self, base_url: str, token: str):
         self._base = base_url.rstrip("/")
         self._token = token
@@ -76,8 +80,12 @@ class MealieClient:
     # --- plumbing -----------------------------------------------------------
 
     async def _request(self, method: str, path: str, *, params=None, json=None):
+        if method not in self.ALLOWED_METHODS:
+            raise ValueError(f"{type(self).__name__} may not send {method} requests")
         if self._session is None:
-            raise RuntimeError("MealieClient must be used as an async context manager")
+            raise RuntimeError(
+                "Mealie clients must be used as an async context manager"
+            )
         try:
             async with self._session.request(
                 method, self._base + path, params=params, json=json
@@ -110,21 +118,13 @@ class MealieClient:
                 break
         return items
 
-    # --- recipes ------------------------------------------------------------
+    # --- recipes (read) -----------------------------------------------------
 
     async def _find_tag(self, name: str) -> dict | None:
         for tag in await self._all_pages("/api/organizers/tags", [("search", name)]):
             if _norm(tag["name"]) == _norm(name):
                 return tag
         return None
-
-    async def _ensure_tag(self, name: str) -> dict:
-        tag = await self._find_tag(name)
-        if tag is None:
-            tag = await self._request(
-                "POST", "/api/organizers/tags", json={"name": name}
-            )
-        return {"id": tag["id"], "name": tag["name"], "slug": tag["slug"]}
 
     async def search_recipes(
         self, query: str = "", tag: str | None = None, limit: int = 10
@@ -171,6 +171,22 @@ class MealieClient:
             ],
             "steps": [s["text"] for s in recipe.get("recipeInstructions", [])],
         }
+
+
+class MealieClient(MealieReader):
+    """Full client, used only by the Confirmer commit."""
+
+    ALLOWED_METHODS = frozenset({"GET", "POST", "PATCH"})
+
+    # --- recipes (write) ----------------------------------------------------
+
+    async def _ensure_tag(self, name: str) -> dict:
+        tag = await self._find_tag(name)
+        if tag is None:
+            tag = await self._request(
+                "POST", "/api/organizers/tags", json={"name": name}
+            )
+        return {"id": tag["id"], "name": tag["name"], "slug": tag["slug"]}
 
     async def _find_recipe_by_name(self, name: str) -> dict | None:
         data = await self._request(

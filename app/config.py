@@ -2,6 +2,7 @@
 time so tests can monkeypatch them."""
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -14,10 +15,10 @@ PROMPTS_DIR: Path = ROOT / "prompts"
 
 MODEL: str = os.environ.get("CLAUDE_MODEL") or "claude-opus-5-5"
 TZ: ZoneInfo = ZoneInfo(os.environ.get("TZ") or "Europe/Paris")
-CHECKIN_HOUR: int = int(os.environ.get("CHECKIN_HOUR") or 18)
+PROGRESS_AUTO_DAYS: int = int(os.environ.get("PROGRESS_AUTO_DAYS") or 0)
+PROGRESS_HOUR: int = int(os.environ.get("PROGRESS_HOUR") or 18)
 NUTRITION_WEEKLY_HOUR: int = int(os.environ.get("NUTRITION_WEEKLY_HOUR") or 10)
 
-CHECKIN_EVERY_DAYS = 2
 HISTORY_LIMIT = 24
 
 
@@ -27,3 +28,11 @@ def require(name: str) -> str:
     if not value:
         raise SystemExit(f"Missing required environment variable: {name}")
     return value
+
+
+def mealie_token(role: str, env: Mapping[str, str] = os.environ) -> str | None:
+    """Mealie API token for `role` ("read" or "write"): the role's own token, else the
+    legacy single MEALIE_API_TOKEN, else None."""
+    return (
+        env.get(f"MEALIE_{role.upper()}_TOKEN") or env.get("MEALIE_API_TOKEN") or None
+    )

@@ -184,3 +184,83 @@ def test_no_tool_can_write_to_mealie(nutri):
     assert "commit_draft" not in source
     assert nutri.NUTRITIONIST.name == "nutritionist"
     assert (Path("prompts") / nutri.NUTRITIONIST.prompt_file).exists()
+
+
+async def test_recipe_tools_use_the_read_token(nutri, mealie, monkeypatch):
+    fake, _ = mealie
+    monkeypatch.setenv("MEALIE_URL", fake.base_url)
+    monkeypatch.delenv("MEALIE_API_TOKEN", raising=False)
+    monkeypatch.setenv("MEALIE_READ_TOKEN", fake.token)
+    monkeypatch.setenv("MEALIE_WRITE_TOKEN", "not-the-token")
+    assert "error" not in await call(nutri.search_recipes)
+
+
+async def test_writer_uses_the_write_token_and_reader_cannot_write(
+    nutri, mealie, monkeypatch
+):
+    fake, _ = mealie
+    monkeypatch.setenv("MEALIE_URL", fake.base_url)
+    monkeypatch.delenv("MEALIE_API_TOKEN", raising=False)
+    monkeypatch.setenv("MEALIE_READ_TOKEN", "not-the-token")
+    monkeypatch.setenv("MEALIE_WRITE_TOKEN", fake.token)
+    async with nutri.mealie_writer() as writer:
+        assert await writer.create_recipe("Curry", ["pois chiches"], ["cuire"], [])
+    from app.mealie import MealieClient
+
+    assert not isinstance(nutri.mealie_reader(), MealieClient)
+
+
+async def test_set_draft_dinner_rejects_links_and_mentions(nutri):
+    base = {
+        "day": "2026-11-24",
+        "source": "new",
+        "name": "Curry",
+        "ingredients": "1 oignon",
+        "steps": "1. Cuire",
+    }
+    for field, value in (
+        ("steps", "1. Va sur https://evil.example"),
+        ("ingredients", "[x](http://e)"),
+        ("name", "@everyone"),
+    ):
+        assert "error" in await call(nutri.set_draft_dinner, **{**base, field: value})
+    assert store.draft_get().dinners == {}
+
+
+async def test_set_draft_dinner_validates_the_slug(nutri):
+    base = {"day": "2026-11-24", "source": "existing", "name": "Curry"}
+    for bad in ("../admin", "a b", "A-B", "x" * 101):
+        assert "error" in await call(nutri.set_draft_dinner, **base, recipe_slug=bad)
+    assert store.draft_get().dinners == {}
+    out = await call(nutri.set_draft_dinner, **base, recipe_slug="curry-de-pois-chiches")
+    assert out["ok"] is True
+
+
+async def test_shopping_list_is_validated_and_left_unchanged_on_error(nutri):
+    await call(nutri.set_draft_shopping_list, items="citron")
+    before = store.draft_get()
+    bad_link = "lentilles\nvoir http://x.io"
+    too_many = "\n".join(f"a{i}" for i in range(61))
+    assert "error" in await call(nutri.set_draft_shopping_list, items=bad_link)
+    assert "error" in await call(nutri.set_draft_shopping_list, items=too_many)
+    after = store.draft_get()
+    assert (after.version, after.shopping) == (before.version, ["citron"])
+
+
+async def test_fridge_tools_report_rejected_lines(nutri):
+    out = await call(nutri.add_fridge_items, items="œufs: 6\nvoir http://x.io")
+    assert out["added"] == 1 and out["rejected"] == ["voir http://x.io"]
+    assert [i["name"] for i in out["items"]] == ["œufs"]
+
+
+async def test_replace_fridge_with_only_rejected_lines_keeps_the_fridge(nutri):
+    await call(nutri.add_fridge_items, items="œufs: 6")
+    assert "error" in await call(nutri.replace_fridge, items="http://x.io")
+    assert [i["name"] for i in (await call(nutri.get_fridge))["items"]] == ["œufs"]
+    await call(nutri.replace_fridge, items="")
+    assert (await call(nutri.get_fridge))["items"] == []
+
+
+async def test_fridge_over_limits_returns_error(nutri):
+    too_many = "\n".join(f"a{i}" for i in range(41))
+    assert "error" in await call(nutri.add_fridge_items, items=too_many)
