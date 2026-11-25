@@ -44,8 +44,8 @@ def build_agents(env: Mapping[str, str]) -> dict[int, Agent]:
         return agents
     if read == write:
         log.warning(
-            "One Mealie token does both reading and writing; create a read-only "
-            "MEALIE_READ_TOKEN and a MEALIE_WRITE_TOKEN"
+            "One Mealie token does both reading and writing; use separate "
+            "MEALIE_READ_TOKEN and MEALIE_WRITE_TOKEN so each can be revoked on its own"
         )
     agents[int(env["NUTRITION_CHANNEL_ID"])] = NUTRITIONIST
     return agents

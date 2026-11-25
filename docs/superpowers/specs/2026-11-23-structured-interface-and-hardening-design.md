@@ -94,7 +94,7 @@ Chosen: **C (A now)**. This is my call: it was the recommendation in the convers
 
 - Two connection factories in `app/db.py`: read-write for handlers, and `connect_ro()` (URI `mode=ro` plus `PRAGMA query_only=ON`) for every model read. The nutritionist's reads of `planned_sessions` use it. A test proves a write through it fails.
 - One SQLite file stays (my call). Splitting into two files or containers is a documented later step, not part of this work.
-- Mealie: split `MealieClient` into a reader (search, get recipe) and a writer (create recipe, plan entry, shopping). Two tokens from two Mealie users with minimal rights: `MEALIE_READ_TOKEN` for the model's reads, `MEALIE_WRITE_TOKEN` used only by the commit. If only the old `MEALIE_API_TOKEN` is set, use it for both and log a warning.
+- Mealie: split `MealieClient` into a reader (search, get recipe) and a writer (create recipe, plan entry, shopping). Two tokens: `MEALIE_READ_TOKEN` for the model's reads, `MEALIE_WRITE_TOKEN` used only by the commit (see the amendment: Mealie cannot give them different rights). If only the old `MEALIE_API_TOKEN` is set, use it for both and log a warning.
 
 ### 6. Container and network
 
@@ -116,7 +116,7 @@ Each phase ships on its own.
 1. Pull-based coach: remove the check-in job and prompt text, progress on demand only. Fixes the user's main annoyance quickly.
 2. Read-only database connection, Mealie reader/writer split and token split, output validators.
 3. Structured interface and single-shot planners (the largest phase).
-4. Container and network hardening.
+4. Container and network hardening (optionally with the Mealie gate, `docs/mealie-gate.md`).
 5. `docs/security.md` and the Discord checklist.
 
 ## Tests
@@ -135,3 +135,7 @@ Each phase ships on its own.
 - Egress proxy software and the final domain allowlist.
 - The hash-locking tool, and the schema migration for the pain flag on `session_logs`.
 - Whether to drop the unused `messages` table.
+
+## Amendments
+
+**2026-11-25: Mealie cannot restrict a token.** Mealie tokens carry all their user's rights and Mealie has no read-only role, so the read/write token split enforces nothing on the Mealie side (the original text assumed two users with different rights). Decision (user): keep the split as enforced by the bot, fix the docs, and document a gate that would enforce it outside the bot in `docs/mealie-gate.md` without building it now.
