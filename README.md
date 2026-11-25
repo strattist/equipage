@@ -7,7 +7,7 @@ Two Discord agents that run on a home NAS (TrueNAS) and help with sport and food
 
 Both agents talk to the user in French. Everything else (code, database, prompts, this README) is English. See the language policy in `docs/superpowers/specs/2026-11-17-coach-design.md`.
 
-> **Status:** the bot foundation, the coach and the nutritionist are implemented (`docs/superpowers/plans/`). The nutritionist's live check against a real Mealie and Discord (last task of its plan) is still to be done by hand.
+> **Status:** the bot foundation, the coach and the nutritionist are implemented (`docs/superpowers/plans/`). The nutritionist has been checked live against a real Mealie and Discord.
 
 ## How it works
 
