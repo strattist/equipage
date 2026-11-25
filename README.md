@@ -59,7 +59,7 @@ The nutritionist reads the coach's planned sessions from the shared database to 
 
 ### 2. Mealie (nutritionist)
 
-Create two API tokens at `<MEALIE_URL>/user/profile/api-tokens`, from two Mealie users: a read-only one (`MEALIE_READ_TOKEN`) and one allowed to create recipes, meal plan entries and shopping items (`MEALIE_WRITE_TOKEN`). See the Tokens section of `docs/mealie-endpoints.md` to check the read user really cannot write. The endpoints used are documented in `docs/mealie-endpoints.md` (taken from your instance's `/docs`).
+Create two API tokens at `<MEALIE_URL>/user/profile/api-tokens` (`MEALIE_READ_TOKEN` and `MEALIE_WRITE_TOKEN`). Mealie cannot restrict a token's rights, so both can do everything their user can: the read/write separation is enforced by the bot (the read client only sends GET) and the two tokens can be revoked separately. A gate in front of Mealie could enforce it outside the bot, see `docs/mealie-gate.md`. The endpoints used are documented in `docs/mealie-endpoints.md` (taken from your instance's `/docs`).
 
 ### 3. Configuration
 
@@ -78,7 +78,7 @@ Fill in `.env`:
 | `COACH_CHANNEL_ID` | yes | | `#coach` channel |
 | `NUTRITION_CHANNEL_ID` | for nutritionist | | `#nutrition` channel; the nutritionist is skipped with a warning if this or a Mealie variable is unset |
 | `MEALIE_URL` | for nutritionist | | Base URL of your Mealie, reachable from the bot's container |
-| `MEALIE_READ_TOKEN` | for nutritionist | | Token of a low-privilege Mealie user: recipe search and reading only (the client refuses any non-GET request with it) |
+| `MEALIE_READ_TOKEN` | for nutritionist | | Token used for recipe search and reading only (the bot's read client refuses any non-GET request; Mealie itself does not restrict the token) |
 | `MEALIE_WRITE_TOKEN` | for nutritionist | | Token used only by the Confirmer commit (recipes, meal plan, shopping list) |
 | `MEALIE_API_TOKEN` | legacy | | One token for both roles: still works, with a warning |
 | `CLAUDE_MODEL` | no | `claude-opus-5-5` | `claude-sonnet-5-5` is the cheaper option |
@@ -122,6 +122,7 @@ Pure logic (meal rules, tools, Mealie client against a mocked server, commit, bu
 |---|---|
 | `docs/superpowers/specs/2026-11-17-coach-design.md` | Coach and bot foundation: goals, decisions, language policy |
 | `docs/superpowers/specs/2026-11-17-nutritionist-design.md` | Nutritionist: rules, confirmation flow, Mealie integration |
+| `docs/mealie-gate.md` | Design (not built) of a proxy that would enforce read/write separation in front of Mealie |
 | `docs/superpowers/plans/2026-11-17-coach-agent.md` | Task-by-task plan for the foundation and the coach |
 | `docs/superpowers/plans/2026-11-17-nutritionist-agent.md` | Task-by-task plan for the nutritionist (builds on the coach plan) |
 | `history/month1.md`, `history/month2.md` | The coaching history that seeds the profile and the weekly structure |

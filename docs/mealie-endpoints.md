@@ -10,9 +10,9 @@ Base URL: `MEALIE_URL` (no trailing slash). Every path starts with `/api`.
 
 ### Tokens
 
-The nutritionist uses two tokens (`MEALIE_READ_TOKEN`, `MEALIE_WRITE_TOKEN`), from two Mealie users. The read token belongs to a second user with the fewest permissions that still allow reading recipes; the write token belongs to the user that may create recipes, plan entries and shopping items. `MealieReader` only sends `GET`, so the model's recipe tools cannot write even with a powerful token, but the Mealie-side restriction is the second line of defence.
+The nutritionist uses two tokens (`MEALIE_READ_TOKEN`, `MEALIE_WRITE_TOKEN`). **Mealie tokens carry all the rights of the user that created them and cannot be restricted**, and Mealie has no read-only role (reported on the user's instance, 2026-11-25). The two tokens are therefore equally powerful: they can be revoked separately, and that is all Mealie enforces.
 
-**To verify by hand on the real instance** (not yet done): with the read token, `curl -X POST "$MEALIE_URL/api/recipes" -H "Authorization: Bearer $READ" -H "Content-Type: application/json" -d '{"name":"x"}'` must be refused (401/403), while the same `GET /api/recipes` call must work.
+The separation is enforced by the bot: `MealieReader` only sends `GET` (any other method raises before a request is made), and only the Confirmer commit uses `MealieClient`. A compromised bot container would still hold a token that can do anything the Mealie user can. `docs/mealie-gate.md` documents a proxy that would enforce the separation outside the bot; it is not built.
 
 All list endpoints are paginated: `{"page", "per_page", "total", "total_pages", "items", "next", "previous"}`; query parameters `page` and `perPage`.
 
