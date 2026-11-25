@@ -1,6 +1,6 @@
 # Nutritionist agent: design
 
-Status: implemented and merged (PR #2); live verification against a real Discord and Mealie (plan Task 9) is still to do. See the plan's implementation record.
+Status: implemented (PR #2) and verified live against a real Discord and Mealie (user report, 2026-11-25). See the plan's implementation record.
 
 ## Intent and why
 

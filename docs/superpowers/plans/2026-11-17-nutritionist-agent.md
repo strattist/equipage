@@ -16,7 +16,7 @@
 
 **Status (2026-11-24):** Tasks 1-8 are implemented and merged to `main` (PR #2). The suite passes (220 tests on `main`, which also include the later security work of PR #3). Their steps are ticked from the merged code and the passing suite; whether each test was written before its code was not re-checked after the fact.
 
-**Not ticked: Task 9 (live verification).** It needs the user's Discord server and Mealie instance, and no result has been reported yet. The nutritionist is therefore implemented, not yet verified live.
+**Task 9 (live verification): done.** On 2026-11-25 the user reported that the live test against their real Discord server and Mealie worked. All six steps are ticked on that report; it gave no per-step detail, so the record holds nothing more specific than that. The nutritionist is implemented and verified live.
 
 **Changes made after this plan** (PR #3, see `docs/superpowers/plans/2026-11-23-pull-based-coach-and-read-only-boundaries.md`): the single `MEALIE_API_TOKEN` is replaced by `MEALIE_READ_TOKEN` (recipe search, GET only) and `MEALIE_WRITE_TOKEN` (the Confirmer commit); the old variable still works with a warning. Task 9 step 1 should now set the two new tokens. The model's reads go through a read-only SQLite connection, and the nutritionist's fridge, draft and shopping inputs are length-limited and reject links and mentions.
 
@@ -242,9 +242,9 @@ This plan builds on `docs/superpowers/plans/2026-11-17-coach-agent.md`, which mu
 
 **Files:** none.
 
-- [ ] **Step 1:** User fills `.env` (`MEALIE_URL`, `MEALIE_API_TOKEN`, `NUTRITION_CHANNEL_ID`, others from Task 8) and starts the bot (`README.md` steps).
-- [ ] **Step 2:** In `#nutrition`, write `[weekly]`-equivalent: "prépare la semaine". Expected: the agent asks away days, fridge and the number of new recipes; after answering, a dinner table appears with a **Confirmer** button; Mealie still contains nothing new.
-- [ ] **Step 3:** Ask "remplace jeudi par du poisson". Expected: a new table is posted, the previous table's button has disappeared, Mealie still untouched.
-- [ ] **Step 4:** Press **Confirmer**. Expected: the button disappears immediately, then the message reports counts; Mealie shows the new recipes (2 portions), dinner and next-day lunch entries, and the shopping list without fridge items; pressing again is impossible.
-- [ ] **Step 5:** Stop Mealie, redo steps 2–4. Expected: a plain French error, the button returns, the draft is intact; start Mealie and press again → no duplicate recipes or entries.
-- [ ] **Step 6:** Ask the coach to change a planned session, then "recalcule le tableau". Expected: dinner types follow the new plan.
+- [x] **Step 1:** User fills `.env` (`MEALIE_URL`, `MEALIE_API_TOKEN`, `NUTRITION_CHANNEL_ID`, others from Task 8) and starts the bot (`README.md` steps).
+- [x] **Step 2:** In `#nutrition`, write `[weekly]`-equivalent: "prépare la semaine". Expected: the agent asks away days, fridge and the number of new recipes; after answering, a dinner table appears with a **Confirmer** button; Mealie still contains nothing new.
+- [x] **Step 3:** Ask "remplace jeudi par du poisson". Expected: a new table is posted, the previous table's button has disappeared, Mealie still untouched.
+- [x] **Step 4:** Press **Confirmer**. Expected: the button disappears immediately, then the message reports counts; Mealie shows the new recipes (2 portions), dinner and next-day lunch entries, and the shopping list without fridge items; pressing again is impossible.
+- [x] **Step 5:** Stop Mealie, redo steps 2–4. Expected: a plain French error, the button returns, the draft is intact; start Mealie and press again → no duplicate recipes or entries.
+- [x] **Step 6:** Ask the coach to change a planned session, then "recalcule le tableau". Expected: dinner types follow the new plan.
