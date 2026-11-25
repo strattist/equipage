@@ -1,6 +1,6 @@
 # Nutritionist agent: design
 
-Status: draft for approval. Not committed (user's rule: never commit).
+Status: implemented and merged (PR #2); live verification against a real Discord and Mealie (plan Task 9) is still to do. See the plan's implementation record.
 
 ## Intent and why
 
